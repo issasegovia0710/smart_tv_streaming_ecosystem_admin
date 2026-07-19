@@ -45,6 +45,12 @@ export const api = {
     }),
   deleteStream: (id) =>
     request(`/streams/${id}`, { method: 'DELETE' }),
+  testStream: (url, streamType) =>
+    request('/streams/test', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ url, streamType }),
+    }),
 
   uploadThumbnail: async (file) => {
     const formData = new FormData();
