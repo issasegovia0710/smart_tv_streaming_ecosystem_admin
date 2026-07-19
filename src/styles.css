@@ -432,6 +432,54 @@ button.test-button {
   background: #03060a;
 }
 
+.web-preview-card {
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  display: grid;
+  place-content: center;
+  justify-items: center;
+  gap: 10px;
+  padding: 28px;
+  text-align: center;
+  border: 1px solid #34415b;
+  border-radius: 14px;
+  background:
+    radial-gradient(circle at 50% 20%, rgba(97, 112, 247, .2), transparent 45%),
+    #090e18;
+}
+
+.web-preview-card h3,
+.web-preview-card p {
+  margin: 0;
+}
+
+.web-preview-card p {
+  max-width: 540px;
+  color: #8f9bb0;
+  line-height: 1.5;
+}
+
+.web-preview-icon {
+  font-size: 3.2rem;
+}
+
+.web-open-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  margin-top: 8px;
+  padding: 11px 17px;
+  border-radius: 10px;
+  color: white;
+  background: #6170f7;
+  text-decoration: none;
+  font-weight: 800;
+}
+
+.web-open-link:hover {
+  filter: brightness(1.08);
+}
+
 .test-help {
   margin: 12px 0 5px;
   color: #d8e0ed;

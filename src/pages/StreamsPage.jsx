@@ -198,6 +198,7 @@ function StreamFormModal({ item, categories, onClose, onSaved, onTest }) {
               <option value="mp4">MP4</option>
               <option value="dash">DASH / mpd</option>
               <option value="rtmp">RTMP (ingestión)</option>
+              <option value="web">WEB / Página externa</option>
               <option value="other">Otro</option>
             </select>
           </label>
@@ -343,6 +344,7 @@ function StreamTestModal({ item, onClose }) {
 
   const url = item.playbackUrl || item.sourceUrl;
   const streamType = item.streamType || 'hls';
+  const isWeb = streamType === 'web';
   const blockedByMixedContent =
     window.location.protocol === 'https:' && /^http:\/\//i.test(url);
 
@@ -377,6 +379,13 @@ function StreamTestModal({ item, onClose }) {
     async function preparePreview() {
       try {
         setPreviewMessage('Preparando reproductor…');
+
+        if (isWeb) {
+          setPreviewMessage(
+            'Es una página web externa. No se envía al reproductor de video; usa Abrir página.',
+          );
+          return;
+        }
 
         if (blockedByMixedContent) {
           setPreviewMessage(
@@ -462,7 +471,7 @@ function StreamTestModal({ item, onClose }) {
       video.removeAttribute('src');
       video.load();
     };
-  }, [blockedByMixedContent, streamType, url]);
+  }, [blockedByMixedContent, isWeb, streamType, url]);
 
   return (
     <Modal
@@ -473,10 +482,28 @@ function StreamTestModal({ item, onClose }) {
     >
       <div className="test-layout">
         <div className="test-player-panel">
-          <video ref={videoRef} className="stream-preview" controls playsInline />
+          {isWeb ? (
+            <div className="web-preview-card">
+              <div className="web-preview-icon">🌐</div>
+              <h3>Página web externa</h3>
+              <p>Este contenido no es un archivo de video. Se abre como una página completa.</p>
+              <a
+                className="web-open-link"
+                href={url}
+                target="_blank"
+                rel="noreferrer"
+              >
+                Abrir página
+              </a>
+            </div>
+          ) : (
+            <video ref={videoRef} className="stream-preview" controls playsInline />
+          )}
           <p className="test-help">{previewMessage}</p>
           <p className="test-note">
-            La prueba del servidor y la vista previa del navegador son independientes. Una fuente puede bloquear CORS en el navegador y aun funcionar en la TV.
+            {isWeb
+              ? 'El panel solo comprueba que la página responda. La compatibilidad final depende del navegador de la TV.'
+              : 'La prueba del servidor y la vista previa del navegador son independientes. Una fuente puede bloquear CORS en el navegador y aun funcionar en la TV.'}
           </p>
         </div>
 
@@ -487,7 +514,9 @@ function StreamTestModal({ item, onClose }) {
           {result && (
             <>
               <div className={`probe-verdict ${result.looksPlayable ? 'ok' : 'bad'}`}>
-                {result.looksPlayable ? 'Fuente válida' : 'Revisar fuente'}
+                {result.looksPlayable
+                  ? (isWeb ? 'Página accesible' : 'Fuente válida')
+                  : 'Revisar fuente'}
               </div>
               <dl className="probe-details">
                 <div><dt>Mensaje</dt><dd>{result.message}</dd></div>
