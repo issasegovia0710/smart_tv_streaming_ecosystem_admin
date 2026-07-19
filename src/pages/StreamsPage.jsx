@@ -343,6 +343,8 @@ function StreamTestModal({ item, onClose }) {
 
   const url = item.playbackUrl || item.sourceUrl;
   const streamType = item.streamType || 'hls';
+  const blockedByMixedContent =
+    window.location.protocol === 'https:' && /^http:\/\//i.test(url);
 
   useEffect(() => {
     let cancelled = false;
@@ -375,6 +377,13 @@ function StreamTestModal({ item, onClose }) {
     async function preparePreview() {
       try {
         setPreviewMessage('Preparando reproductor…');
+
+        if (blockedByMixedContent) {
+          setPreviewMessage(
+            'El navegador bloquea esta vista previa porque el panel usa HTTPS y la fuente usa HTTP. El diagnóstico del backend aparece a la derecha; la TV puede probarla directamente.',
+          );
+          return;
+        }
 
         if (streamType === 'rtmp' || /^rtmps?:\/\//i.test(url)) {
           setPreviewMessage('RTMP no se reproduce en navegador. Usa la salida HLS o DASH.');
@@ -453,7 +462,7 @@ function StreamTestModal({ item, onClose }) {
       video.removeAttribute('src');
       video.load();
     };
-  }, [streamType, url]);
+  }, [blockedByMixedContent, streamType, url]);
 
   return (
     <Modal
