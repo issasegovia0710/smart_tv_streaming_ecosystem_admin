@@ -198,7 +198,7 @@ function StreamFormModal({ item, categories, onClose, onSaved, onTest }) {
               <option value="mp4">MP4</option>
               <option value="dash">DASH / mpd</option>
               <option value="rtmp">RTMP (ingestión)</option>
-              <option value="web">WEB / Página externa</option>
+              <option value="web">WEB / Página integrada</option>
               <option value="other">Otro</option>
             </select>
           </label>
@@ -371,21 +371,21 @@ function StreamTestModal({ item, onClose }) {
   }, [streamType, url]);
 
   useEffect(() => {
+    if (!url) return undefined;
+
+    if (isWeb) {
+      setPreviewMessage('Cargando la página dentro del panel…');
+      return undefined;
+    }
+
     const video = videoRef.current;
-    if (!video || !url) return undefined;
+    if (!video) return undefined;
 
     let cancelled = false;
 
     async function preparePreview() {
       try {
         setPreviewMessage('Preparando reproductor…');
-
-        if (isWeb) {
-          setPreviewMessage(
-            'Es una página web externa. No se envía al reproductor de video; usa Abrir página.',
-          );
-          return;
-        }
 
         if (blockedByMixedContent) {
           setPreviewMessage(
@@ -483,18 +483,18 @@ function StreamTestModal({ item, onClose }) {
       <div className="test-layout">
         <div className="test-player-panel">
           {isWeb ? (
-            <div className="web-preview-card">
-              <div className="web-preview-icon">🌐</div>
-              <h3>Página web externa</h3>
-              <p>Este contenido no es un archivo de video. Se abre como una página completa.</p>
-              <a
-                className="web-open-link"
-                href={url}
-                target="_blank"
-                rel="noreferrer"
-              >
-                Abrir página
-              </a>
+            <div className="web-preview-shell">
+              <iframe
+                key={url}
+                className="web-preview-frame"
+                src={url}
+                title={`Vista previa de ${item.title || 'página web'}`}
+                allow="autoplay; encrypted-media; fullscreen; picture-in-picture"
+                sandbox="allow-forms allow-modals allow-presentation allow-same-origin allow-scripts"
+                referrerPolicy="strict-origin-when-cross-origin"
+                allowFullScreen
+                onLoad={() => setPreviewMessage('Página cargada dentro del panel.')}
+              />
             </div>
           ) : (
             <video ref={videoRef} className="stream-preview" controls playsInline />
@@ -502,7 +502,7 @@ function StreamTestModal({ item, onClose }) {
           <p className="test-help">{previewMessage}</p>
           <p className="test-note">
             {isWeb
-              ? 'El panel solo comprueba que la página responda. La compatibilidad final depende del navegador de la TV.'
+              ? 'La página permanece dentro del panel. Algunos sitios pueden impedir ser mostrados en un iframe mediante sus políticas de seguridad.'
               : 'La prueba del servidor y la vista previa del navegador son independientes. Una fuente puede bloquear CORS en el navegador y aun funcionar en la TV.'}
           </p>
         </div>
