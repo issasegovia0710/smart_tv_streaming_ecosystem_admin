@@ -380,7 +380,7 @@ function StreamTestModal({ item, onClose }) {
       if (isWeb) {
         setPreviewMessage(
           loading
-            ? 'Buscando una URL directa HLS, DASH o MP4…'
+            ? 'Abriendo la página en el navegador seguro del backend y observando el reproductor…'
             : result?.message || 'No se encontró un flujo directo reproducible.',
         );
       }
@@ -498,8 +498,8 @@ function StreamTestModal({ item, onClose }) {
               <div className="web-preview-icon">📡</div>
               <h3>Resolución de canal web</h3>
               <p>
-                No se usa iframe ni se abre una pestaña. El backend busca el flujo directo
-                HLS, DASH o MP4 para enviarlo al reproductor.
+                No se usa iframe ni se abre una pestaña. El backend ejecuta la página PHP/HTML,
+                observa sus solicitudes de red y envía el flujo encontrado al reproductor.
               </p>
             </div>
           ) : (
@@ -508,14 +508,14 @@ function StreamTestModal({ item, onClose }) {
           <p className="test-help">{previewMessage}</p>
           <p className="test-note">
             {isWeb
-              ? 'La TV nunca abrirá el navegador. Si no se puede extraer un flujo directo, mostrará el error dentro de la app.'
+              ? 'La TV nunca abrirá el navegador. El backend conserva cookies y User-Agent cuando la página los necesita.'
               : 'La prueba del servidor y la vista previa del navegador son independientes. Una fuente puede bloquear CORS en el navegador y aun funcionar en la TV.'}
           </p>
         </div>
 
         <aside className="probe-panel">
           <h3>Diagnóstico del backend</h3>
-          {loading && <p className="muted">Analizando URL y buscando el flujo directo…</p>}
+          {loading && <p className="muted">Ejecutando la página y observando sus solicitudes de video…</p>}
           {error && <div className="status-message error">{error}</div>}
           {result && (
             <>
@@ -532,7 +532,19 @@ function StreamTestModal({ item, onClose }) {
                 {isWeb && (
                   <>
                     <div><dt>Tipo resuelto</dt><dd>{result.resolvedType || 'No encontrado'}</dd></div>
+                    <div><dt>Motor de resolución</dt><dd>{result.resolverEngine || 'No informado'}</dd></div>
+                    <div><dt>Sesión/cookies</dt><dd>{result.cookieHeader ? 'Detectadas' : 'No necesarias'}</dd></div>
                     <div><dt>Flujo resuelto</dt><dd>{result.resolvedPlaybackUrl || 'No encontrado'}</dd></div>
+                    {result.browserDiagnostics && (
+                      <div>
+                        <dt>Red observada</dt>
+                        <dd>
+                          {result.browserDiagnostics.requestsObserved || 0} solicitudes, {' '}
+                          {result.browserDiagnostics.candidateCount || 0} candidatos
+                        </dd>
+                      </div>
+                    )}
+                    {result.warning && <div><dt>Aviso</dt><dd>{result.warning}</dd></div>}
                   </>
                 )}
                 {result.hls && (
