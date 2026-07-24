@@ -198,7 +198,7 @@ function StreamFormModal({ item, categories, onClose, onSaved, onTest }) {
               <option value="mp4">MP4</option>
               <option value="dash">DASH / mpd</option>
               <option value="rtmp">RTMP (ingestión)</option>
-              <option value="web">WEB / Página integrada</option>
+              <option value="web">WEB / Página externa</option>
               <option value="other">Otro</option>
             </select>
           </label>
@@ -340,14 +340,18 @@ function StreamTestModal({ item, onClose }) {
   const [result, setResult] = useState(null);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(true);
-  const [previewMessage, setPreviewMessage] = useState('Preparando reproductor…');
+  const [previewMessage, setPreviewMessage] = useState('Analizando fuente…');
 
   const url = item.playbackUrl || item.sourceUrl;
   const streamType = item.streamType || 'hls';
   const isWeb = streamType === 'web';
+  const resolvedWebUrl = isWeb ? result?.resolvedPlaybackUrl || '' : '';
+  const previewUrl = isWeb ? resolvedWebUrl : url;
+  const previewType = isWeb ? result?.resolvedType || '' : streamType;
   const blockedByMixedContent =
-    !isWeb && window.location.protocol === 'https:' && /^http:\/\//i.test(url);
-  const webPreviewUrl = isWeb ? api.webPagePreviewUrl(url, 'admin') : '';
+    Boolean(previewUrl) &&
+    window.location.protocol === 'https:' &&
+    /^http:\/\//i.test(previewUrl);
 
   useEffect(() => {
     let cancelled = false;
@@ -372,10 +376,14 @@ function StreamTestModal({ item, onClose }) {
   }, [streamType, url]);
 
   useEffect(() => {
-    if (!url) return undefined;
-
-    if (isWeb) {
-      setPreviewMessage('Cargando la página dentro del panel…');
+    if (!previewUrl) {
+      if (isWeb) {
+        setPreviewMessage(
+          loading
+            ? 'Buscando una URL directa HLS, DASH o MP4…'
+            : result?.message || 'No se encontró un flujo directo reproducible.',
+        );
+      }
       return undefined;
     }
 
@@ -386,23 +394,25 @@ function StreamTestModal({ item, onClose }) {
 
     async function preparePreview() {
       try {
-        setPreviewMessage('Preparando reproductor…');
+        setPreviewMessage(
+          isWeb ? 'Flujo directo encontrado. Preparando vista previa…' : 'Preparando reproductor…',
+        );
 
         if (blockedByMixedContent) {
           setPreviewMessage(
-            'El navegador bloquea esta vista previa porque el panel usa HTTPS y la fuente usa HTTP. El diagnóstico del backend aparece a la derecha; la TV puede probarla directamente.',
+            'El panel usa HTTPS y el flujo resuelto usa HTTP. El navegador puede bloquear esta vista previa, aunque la TV puede reproducirlo directamente con AVPlay.',
           );
           return;
         }
 
-        if (streamType === 'rtmp' || /^rtmps?:\/\//i.test(url)) {
-          setPreviewMessage('RTMP no se reproduce en navegador. Usa la salida HLS o DASH.');
+        if (previewType === 'rtmp' || /^rtmps?:\/\//i.test(previewUrl)) {
+          setPreviewMessage('RTMP no se reproduce en navegador. Usa una salida HLS o DASH.');
           return;
         }
 
-        if (streamType === 'hls' || /\.m3u8(?:$|\?)/i.test(url)) {
+        if (previewType === 'hls' || /\.m3u8(?:$|\?)/i.test(previewUrl)) {
           if (video.canPlayType('application/vnd.apple.mpegurl')) {
-            video.src = url;
+            video.src = previewUrl;
             setPreviewMessage('Fuente HLS lista. Presiona reproducir.');
             return;
           }
@@ -420,7 +430,7 @@ function StreamTestModal({ item, onClose }) {
 
           const hls = new Hls({ enableWorker: true, lowLatencyMode: true });
           playerRef.current = hls;
-          hls.loadSource(url);
+          hls.loadSource(previewUrl);
           hls.attachMedia(video);
           hls.on(Hls.Events.MANIFEST_PARSED, () => {
             if (!cancelled) setPreviewMessage('HLS listo. Presiona reproducir.');
@@ -433,7 +443,7 @@ function StreamTestModal({ item, onClose }) {
           return;
         }
 
-        if (streamType === 'dash' || /\.mpd(?:$|\?)/i.test(url)) {
+        if (previewType === 'dash' || /\.mpd(?:$|\?)/i.test(previewUrl)) {
           const dashjs = await loadExternalScript(
             'https://cdn.jsdelivr.net/npm/dashjs@4.7.4/dist/dash.all.min.js',
             'dashjs',
@@ -442,12 +452,12 @@ function StreamTestModal({ item, onClose }) {
           if (cancelled) return;
           const player = dashjs.MediaPlayer().create();
           playerRef.current = player;
-          player.initialize(video, url, false);
+          player.initialize(video, previewUrl, false);
           setPreviewMessage('DASH listo. Presiona reproducir.');
           return;
         }
 
-        video.src = url;
+        video.src = previewUrl;
         setPreviewMessage('Fuente lista. Presiona reproducir.');
       } catch (previewError) {
         if (!cancelled) {
@@ -472,7 +482,7 @@ function StreamTestModal({ item, onClose }) {
       video.removeAttribute('src');
       video.load();
     };
-  }, [blockedByMixedContent, isWeb, streamType, url]);
+  }, [blockedByMixedContent, isWeb, loading, previewType, previewUrl, result]);
 
   return (
     <Modal
@@ -483,18 +493,14 @@ function StreamTestModal({ item, onClose }) {
     >
       <div className="test-layout">
         <div className="test-player-panel">
-          {isWeb ? (
-            <div className="web-preview-shell">
-              <iframe
-                key={url}
-                className="web-preview-frame"
-                src={webPreviewUrl}
-                title={`Vista previa de ${item.title || 'página web'}`}
-                allow="autoplay; encrypted-media; fullscreen; picture-in-picture"
-                referrerPolicy="no-referrer-when-downgrade"
-                allowFullScreen
-                onLoad={() => setPreviewMessage('Página cargada dentro del panel sin sandbox.')}
-              />
+          {isWeb && !resolvedWebUrl ? (
+            <div className="web-preview-card">
+              <div className="web-preview-icon">📡</div>
+              <h3>Resolución de canal web</h3>
+              <p>
+                No se usa iframe ni se abre una pestaña. El backend busca el flujo directo
+                HLS, DASH o MP4 para enviarlo al reproductor.
+              </p>
             </div>
           ) : (
             <video ref={videoRef} className="stream-preview" controls playsInline />
@@ -502,27 +508,33 @@ function StreamTestModal({ item, onClose }) {
           <p className="test-help">{previewMessage}</p>
           <p className="test-note">
             {isWeb
-              ? 'La página se carga mediante el visor interno del backend y sin atributo sandbox. Los enlaces se mantienen dentro de la vista previa.'
+              ? 'La TV nunca abrirá el navegador. Si no se puede extraer un flujo directo, mostrará el error dentro de la app.'
               : 'La prueba del servidor y la vista previa del navegador son independientes. Una fuente puede bloquear CORS en el navegador y aun funcionar en la TV.'}
           </p>
         </div>
 
         <aside className="probe-panel">
           <h3>Diagnóstico del backend</h3>
-          {loading && <p className="muted">Comprobando URL…</p>}
+          {loading && <p className="muted">Analizando URL y buscando el flujo directo…</p>}
           {error && <div className="status-message error">{error}</div>}
           {result && (
             <>
               <div className={`probe-verdict ${result.looksPlayable ? 'ok' : 'bad'}`}>
                 {result.looksPlayable
-                  ? (isWeb ? 'Página accesible' : 'Fuente válida')
-                  : 'Revisar fuente'}
+                  ? (isWeb ? 'Flujo directo encontrado' : 'Fuente válida')
+                  : (isWeb ? 'Sin flujo directo' : 'Revisar fuente')}
               </div>
               <dl className="probe-details">
                 <div><dt>Mensaje</dt><dd>{result.message}</dd></div>
                 <div><dt>HTTP</dt><dd>{result.status ?? 'Sin respuesta'}</dd></div>
                 <div><dt>Tipo detectado</dt><dd>{result.detectedType || 'Desconocido'}</dd></div>
                 <div><dt>Content-Type</dt><dd>{result.contentType || 'No enviado'}</dd></div>
+                {isWeb && (
+                  <>
+                    <div><dt>Tipo resuelto</dt><dd>{result.resolvedType || 'No encontrado'}</dd></div>
+                    <div><dt>Flujo resuelto</dt><dd>{result.resolvedPlaybackUrl || 'No encontrado'}</dd></div>
+                  </>
+                )}
                 {result.hls && (
                   <>
                     <div><dt>Manifiesto HLS</dt><dd>{result.hls.valid ? 'Válido' : 'Inválido'}</dd></div>
