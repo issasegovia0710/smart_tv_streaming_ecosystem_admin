@@ -171,7 +171,7 @@ function StreamFormModal({ item, categories, onClose, onSaved, onTest }) {
     <Modal
       wide
       title={item ? `Editar: ${item.title}` : 'Agregar contenido'}
-      description="Para WEB, guarda la página PHP/HTML como fuente. Si conoces el HLS/DASH/MP4, colócalo como URL de reproducción; la TV lo usará directamente."
+      description="Si un endpoint .php devuelve realmente un manifiesto que inicia con #EXTM3U, selecciona HLS y colócalo en URL de reproducción. El backend lo validará y lo enviará por proxy a la TV. Una página HTML normal debe conservarse como tipo WEB."
       onClose={onClose}
     >
       <form className="modal-form" onSubmit={submit}>
@@ -218,7 +218,7 @@ function StreamFormModal({ item, categories, onClose, onSaved, onTest }) {
             URL de reproducción
             <input
               type="url"
-              placeholder="Opcional: https://.../master.m3u8, manifest.mpd o video.mp4"
+              placeholder="Ej.: master.m3u8 o endpoint .php que responda con #EXTM3U"
               value={form.playbackUrl}
               onChange={(event) => update('playbackUrl', event.target.value)}
             />
@@ -346,8 +346,8 @@ function StreamTestModal({ item, onClose }) {
   const streamType = item.streamType || 'hls';
   const isWeb = streamType === 'web';
   const resolvedWebUrl = isWeb ? result?.resolvedPlaybackUrl || '' : '';
-  const previewUrl = isWeb ? resolvedWebUrl : url;
-  const previewType = isWeb ? result?.resolvedType || '' : streamType;
+  const previewUrl = result?.resolvedPlaybackUrl || (isWeb ? resolvedWebUrl : url);
+  const previewType = result?.resolvedType || (isWeb ? '' : streamType);
   const blockedByMixedContent =
     Boolean(previewUrl) &&
     window.location.protocol === 'https:' &&
@@ -395,7 +395,7 @@ function StreamTestModal({ item, onClose }) {
     async function preparePreview() {
       try {
         setPreviewMessage(
-          isWeb ? 'Flujo directo encontrado. Preparando vista previa…' : 'Preparando reproductor…',
+          isWeb ? 'Flujo validado. Preparando vista previa mediante el proxy seguro…' : 'Preparando reproductor…',
         );
 
         if (blockedByMixedContent) {
@@ -413,7 +413,7 @@ function StreamTestModal({ item, onClose }) {
         if (previewType === 'hls' || /\.m3u8(?:$|\?)/i.test(previewUrl)) {
           if (video.canPlayType('application/vnd.apple.mpegurl')) {
             video.src = previewUrl;
-            setPreviewMessage('Fuente HLS lista. Presiona reproducir.');
+            setPreviewMessage('HLS validado. Presiona reproducir.');
             return;
           }
 
@@ -433,7 +433,7 @@ function StreamTestModal({ item, onClose }) {
           hls.loadSource(previewUrl);
           hls.attachMedia(video);
           hls.on(Hls.Events.MANIFEST_PARSED, () => {
-            if (!cancelled) setPreviewMessage('HLS listo. Presiona reproducir.');
+            if (!cancelled) setPreviewMessage('HLS validado y listo. Presiona reproducir.');
           });
           hls.on(Hls.Events.ERROR, (_, data) => {
             if (!cancelled && data?.fatal) {
@@ -499,7 +499,7 @@ function StreamTestModal({ item, onClose }) {
               <h3>Resolución de canal web</h3>
               <p>
                 No se usa iframe ni se abre una pestaña. El backend ejecuta la página PHP/HTML,
-                observa sus solicitudes de red y envía el flujo encontrado al reproductor.
+                valida el manifiesto y un segmento, y entrega una URL temporal del propio backend.
               </p>
             </div>
           ) : (
@@ -508,7 +508,7 @@ function StreamTestModal({ item, onClose }) {
           <p className="test-help">{previewMessage}</p>
           <p className="test-note">
             {isWeb
-              ? 'La TV nunca abrirá el navegador. El backend conserva cookies y User-Agent cuando la página los necesita.'
+              ? 'La TV nunca abrirá el navegador. Las variantes, segmentos y llaves HLS pasan por el backend cuando la fuente requiere sesión, Referer o cookies.'
               : 'La prueba del servidor y la vista previa del navegador son independientes. Una fuente puede bloquear CORS en el navegador y aun funcionar en la TV.'}
           </p>
         </div>
@@ -521,8 +521,8 @@ function StreamTestModal({ item, onClose }) {
             <>
               <div className={`probe-verdict ${result.looksPlayable ? 'ok' : 'bad'}`}>
                 {result.looksPlayable
-                  ? (isWeb ? 'Flujo directo encontrado' : 'Fuente válida')
-                  : (isWeb ? 'Sin flujo directo' : 'Revisar fuente')}
+                  ? (isWeb ? 'Flujo validado y listo' : 'Fuente válida')
+                  : (isWeb ? 'Sin flujo reproducible' : 'Revisar fuente')}
               </div>
               <dl className="probe-details">
                 <div><dt>Mensaje</dt><dd>{result.message}</dd></div>
@@ -534,7 +534,18 @@ function StreamTestModal({ item, onClose }) {
                     <div><dt>Tipo resuelto</dt><dd>{result.resolvedType || 'No encontrado'}</dd></div>
                     <div><dt>Motor de resolución</dt><dd>{result.resolverEngine || 'No informado'}</dd></div>
                     <div><dt>Sesión/cookies</dt><dd>{result.cookieHeader ? 'Detectadas' : 'No necesarias'}</dd></div>
-                    <div><dt>Flujo resuelto</dt><dd>{result.resolvedPlaybackUrl || 'No encontrado'}</dd></div>
+                    <div><dt>Modo de reproducción</dt><dd>{result.playbackMode || 'directo'}</dd></div>
+                    <div><dt>Flujo entregado</dt><dd>{result.resolvedPlaybackUrl || 'No encontrado'}</dd></div>
+                    {result.validation && (
+                      <div>
+                        <dt>Validación</dt>
+                        <dd>
+                          {result.validation.valid
+                            ? `Manifiesto y segmento correctos (${result.validation.manifestUriCount || 0} referencias)`
+                            : result.validation.reason || 'No superada'}
+                        </dd>
+                      </div>
+                    )}
                     {result.browserDiagnostics && (
                       <div>
                         <dt>Red observada</dt>
