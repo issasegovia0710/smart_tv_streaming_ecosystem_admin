@@ -171,7 +171,7 @@ function StreamFormModal({ item, categories, onClose, onSaved, onTest }) {
     <Modal
       wide
       title={item ? `Editar: ${item.title}` : 'Agregar contenido'}
-      description="Completa los datos del canal o video. La URL de reproducción puede quedar vacía si es igual a la fuente."
+      description="Para WEB, guarda la página PHP/HTML como fuente. Si conoces el HLS/DASH/MP4, colócalo como URL de reproducción; la TV lo usará directamente."
       onClose={onClose}
     >
       <form className="modal-form" onSubmit={submit}>
@@ -218,7 +218,7 @@ function StreamFormModal({ item, categories, onClose, onSaved, onTest }) {
             URL de reproducción
             <input
               type="url"
-              placeholder="Déjala vacía para usar la URL fuente"
+              placeholder="Opcional: https://.../master.m3u8, manifest.mpd o video.mp4"
               value={form.playbackUrl}
               onChange={(event) => update('playbackUrl', event.target.value)}
             />
