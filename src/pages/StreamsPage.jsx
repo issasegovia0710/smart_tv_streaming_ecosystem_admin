@@ -346,7 +346,8 @@ function StreamTestModal({ item, onClose }) {
   const streamType = item.streamType || 'hls';
   const isWeb = streamType === 'web';
   const blockedByMixedContent =
-    window.location.protocol === 'https:' && /^http:\/\//i.test(url);
+    !isWeb && window.location.protocol === 'https:' && /^http:\/\//i.test(url);
+  const webPreviewUrl = isWeb ? api.webPagePreviewUrl(url, 'admin') : '';
 
   useEffect(() => {
     let cancelled = false;
@@ -487,13 +488,12 @@ function StreamTestModal({ item, onClose }) {
               <iframe
                 key={url}
                 className="web-preview-frame"
-                src={url}
+                src={webPreviewUrl}
                 title={`Vista previa de ${item.title || 'página web'}`}
                 allow="autoplay; encrypted-media; fullscreen; picture-in-picture"
-                sandbox="allow-forms allow-modals allow-presentation allow-same-origin allow-scripts"
-                referrerPolicy="strict-origin-when-cross-origin"
+                referrerPolicy="no-referrer-when-downgrade"
                 allowFullScreen
-                onLoad={() => setPreviewMessage('Página cargada dentro del panel.')}
+                onLoad={() => setPreviewMessage('Página cargada dentro del panel sin sandbox.')}
               />
             </div>
           ) : (
@@ -502,7 +502,7 @@ function StreamTestModal({ item, onClose }) {
           <p className="test-help">{previewMessage}</p>
           <p className="test-note">
             {isWeb
-              ? 'La página permanece dentro del panel. Algunos sitios pueden impedir ser mostrados en un iframe mediante sus políticas de seguridad.'
+              ? 'La página se carga mediante el visor interno del backend y sin atributo sandbox. Los enlaces se mantienen dentro de la vista previa.'
               : 'La prueba del servidor y la vista previa del navegador son independientes. Una fuente puede bloquear CORS en el navegador y aun funcionar en la TV.'}
           </p>
         </div>

@@ -51,6 +51,8 @@ export const api = {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ url, streamType }),
     }),
+  webPagePreviewUrl: (url, mode = 'admin') =>
+    `${API_BASE_URL}/web-pages/render?mode=${encodeURIComponent(mode)}&url=${encodeURIComponent(url)}`,
 
   uploadThumbnail: async (file) => {
     const formData = new FormData();
